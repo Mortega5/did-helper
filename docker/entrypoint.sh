@@ -1,8 +1,14 @@
 #!/bin/bash
 
+set -eo pipefail
+
+KEY_TYPE_TO_GENERATE="${KEY_TYPE_TO_GENERATE:-EC}"
+KEY_TYPE="${KEY_TYPE:-P-256}"
+STORE_PASS="${STORE_PASS:-changeit}"
+
 cd /cert
 
-if [ -z "$KEYSTORE_PATH" ] && [ -z "$CERT_URL" ]; then
+if [[ -z "${KEYSTORE_PATH:-}" ]] && [[ -z "${CERT_URL:-}" ]]; then
   case "$KEY_TYPE_TO_GENERATE" in
     EC)
       case "$KEY_TYPE" in
@@ -38,12 +44,33 @@ if [ -z "$KEYSTORE_PATH" ] && [ -z "$CERT_URL" ]; then
       ;;
   esac
   echo -e "Generating certificate\nC=${COUNTRY}\nST=${STATE}\nL=${LOCALITY}\nO=${ORGANIZATION}\CN=${COMMON_NAME}"
-  openssl req -new -x509 -key private-key.pem -out cert.pem -days 360 -subj "/C=${COUNTRY}/ST=${STATE}/L=${LOCALITY}/O=${ORGANIZATION}/CN=${COMMON_NAME}"
-  openssl pkcs12 -export -inkey private-key.pem -in cert.pem -out cert.pfx -name ${KEY_ALIAS} -password pass:${STORE_PASS}
 
+  openssl req -new -x509 -key private-key.pem -out cert.pem -days 360 \
+    -subj "/C=${COUNTRY:-ES}/ST=${STATE:-NA}/L=${LOCALITY:-NA}/O=${ORGANIZATION:-NA}/CN=${COMMON_NAME:-localhost}"
 
-  cd /temp
-  /did-helper/did-helper -keystorePath /cert/cert.pfx -keystorePassword ${STORE_PASS} -outputFile ${OUTPUT_FILE} -outputFormat ${OUTPUT_FORMAT} -didType ${DID_TYPE} -keyType ${KEY_TYPE} -hostUrl ${HOST_URL} -certUrl ${CERT_URL} -server=${RUN_SERVER:-false} -port ${SERVER_PORT:-8080}
+  openssl pkcs12 -export -inkey private-key.pem -in cert.pem -out cert.pfx \
+    -name "${KEY_ALIAS:-cert}" -password "pass:${STORE_PASS}"
+
+  CURRENT_KEYSTORE="/cert/cert.pfx"
 else
-  /did-helper/did-helper -keystorePath ${KEYSTORE_PATH} -keystorePassword ${STORE_PASS} -outputFile ${OUTPUT_FILE} -outputFormat ${OUTPUT_FORMAT} -didType ${DID_TYPE} -keyType ${KEY_TYPE} -hostUrl ${HOST_URL} -certUrl ${CERT_URL} -server=${RUN_SERVER:-false} -port ${SERVER_PORT:-8080} $@
+    CURRENT_KEYSTORE="${KEYSTORE_PATH:-}"
 fi
+
+args=()
+
+[[ -n "$CURRENT_KEYSTORE" ]] && args+=("-keystorePath" "$CURRENT_KEYSTORE")
+[[ -n "$STORE_PASS" ]]       && args+=("-keystorePassword" "$STORE_PASS")
+[[ -n "$OUTPUT_FILE" ]]      && args+=("-outputFile" "$OUTPUT_FILE")
+[[ -n "$OUTPUT_FORMAT" ]]    && args+=("-outputFormat" "$OUTPUT_FORMAT")
+[[ -n "$DID_TYPE" ]]         && args+=("-didType" "$DID_TYPE")
+[[ -n "$KEY_TYPE" ]]         && args+=("-keyType" "$KEY_TYPE")
+[[ -n "$HOST_URL" ]]         && args+=("-hostUrl" "$HOST_URL")
+[[ -n "$CERT_URL" ]]         && args+=("-certUrl" "$CERT_URL")
+
+if [[ "${RUN_SERVER:-}" == "true" ]]; then
+    args+=("-server=true")
+    args+=("-port" "${SERVER_PORT:-8080}")
+fi
+
+cd /temp
+/did-helper/did-helper "${args[@]}" "$@"
