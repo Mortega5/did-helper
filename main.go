@@ -97,9 +97,16 @@ func main() {
 			zap.L().Sugar().Errorf("'%s' is not a valid url")
 			os.Exit(7)
 		}
-		server := did.NewDidServer(string(fileContent), string(cert), cfg.ServerPort, webUrl.Path)
+		didFilename := "did.json"
+		if cfg.OutputFormat == "env" {
+			didFilename = "did.env"
+		}
+
+		server := did.NewDidServer(string(fileContent), string(cert), cfg.ServerPort, webUrl.Path, didFilename)
 		server.Start()
 	} else {
 		fmt.Println("Output: ", string(fileContent))
 	}
 }
+
+

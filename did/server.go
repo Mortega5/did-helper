@@ -21,7 +21,7 @@ type DidServer struct {
 	Logger         *zap.Logger
 }
 
-func NewDidServer(didJSON string, tlsCRT string, port int, basepath string) *DidServer {
+func NewDidServer(didJSON string, tlsCRT string, port int, basepath string, didFilename string) *DidServer {
 	logger, err := zap.NewProduction()
 	if err != nil {
 		log.Fatalf("Failed to initialize Zap logger: %v", err)
@@ -36,10 +36,11 @@ func NewDidServer(didJSON string, tlsCRT string, port int, basepath string) *Did
 
 	var didPath string
 	var certPath = basepath + "/.well-known/tls.crt"
+	// Ensure basepath has no trailing slash
 	if basepath == "" {
-		didPath = "/.well-known/did.json"
+		didPath = "/.well-known/" + didFilename
 	} else {
-		didPath = basepath + "/did.json"
+		didPath = basepath + "/" + didFilename
 	}
 
 	mux.HandleFunc(didPath, s.handleDidJSON)
@@ -77,6 +78,7 @@ func (s *DidServer) handleTlsCRT(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
 	w.WriteHeader(http.StatusOK)
+
 	if _, err := w.Write([]byte(s.TlsCRTContent)); err != nil {
 		s.Logger.Error("Error writing response for /tls.crt", zap.Error(err))
 	} else {
